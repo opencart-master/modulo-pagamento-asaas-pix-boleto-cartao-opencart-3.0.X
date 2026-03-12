@@ -16,6 +16,8 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 
 			$this->session->data['success'] = $this->language->get('text_success');
 
+			$this->checkSandbox(false);
+
 			$this->response->redirect($this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'] . '&type=payment', true));
 		}
 
@@ -217,8 +219,6 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 			$mode = true;
 		}
 		$resposta = $this->createWebhook($webhook, $mode);
-
-        $this->checkSandbox($mode);
 
 		if(isset($resposta['errors'])) {
 		$this->error['warning'] = $resposta['errors'][0]['description'];	
