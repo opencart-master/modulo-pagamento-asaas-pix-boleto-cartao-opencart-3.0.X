@@ -18,9 +18,9 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 
 			$this->session->data['success'] = $this->language->get('text_success');
 
-			if($this->config->get('payment_asaas_pix_mode')){$mode=false;}else{$mode=true;}
-			$asaas = new AsaasApi($this->config->get('payment_asaas_pix_api_key'), $mode);
-			$sandbox = $asaas->checkSandbox('');
+			$asaas = new AsaasApi($this->config->get('payment_asaas_pix_api_key'));
+			
+			$sandbox = $asaas->checkSandbox($this->config->get('payment_asaas_pix_api_key'));
 
 			$this->response->redirect($this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'] . '&type=payment', true));
 		}
@@ -108,12 +108,6 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 			$data['payment_asaas_pix_order_status_id5'] = $this->config->get('payment_asaas_pix_order_status_id5');
 		}
 
-		if (isset($this->request->post['payment_asaas_pix_mode'])) {
-			$data['payment_asaas_pix_mode'] = $this->request->post['payment_asaas_pix_mode'];
-		} else {
-			$data['payment_asaas_pix_mode'] = $this->config->get('payment_asaas_pix_mode');
-		}
-
 		$this->load->model('localisation/order_status');
 
 		$data['order_statuses'] = $this->model_localisation_order_status->getOrderStatuses();
@@ -129,7 +123,7 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 		} elseif(!empty($this->config->get('payment_asaas_pix_wb'))) {
 			$data['payment_asaas_pix_wb'] = $this->config->get('payment_asaas_pix_wb');
 		} else {
-			$data['payment_asaas_pix_wb'] = token(10);
+			$data['payment_asaas_pix_wb'] = token(32);
 		}
 
 		if (isset($this->request->post['payment_asaas_pix_sort_order'])) {
@@ -148,6 +142,14 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 			$data['payment_asaas_pix_doc1'] = $this->request->post['payment_asaas_pix_doc1'];
 		} else {
 			$data['payment_asaas_pix_doc1'] = $this->config->get('payment_asaas_pix_doc1');
+		}
+
+		if (isset($this->request->post['payment_asaas_pix_venc'])) {
+			$data['payment_asaas_pix_venc'] = $this->request->post['payment_asaas_pix_venc'];
+		} elseif (!empty($this->config->get('payment_asaas_pix_venc'))) {
+		    $data['payment_asaas_pix_venc'] = $this->config->get('payment_asaas_pix_venc');
+		} else {
+			$data['payment_asaas_pix_venc'] = 1;
 		}
 
 		$this->load->model('customer/custom_field');
@@ -180,7 +182,7 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 
 	public function install() {
 		require_once(DIR_SYSTEM . 'library/asaas/asaas_api.php');
-        $asaas = new AsaasApi('', true);
+        $asaas = new AsaasApi($this->config->get('payment_asaas_pix_api_key'));
 	    $check = $asaas->check();
     }
 
@@ -195,6 +197,8 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
     }
 
 	public function webhook() {
+		require_once(DIR_SYSTEM . 'library/asaas/asaas_api.php');
+        $asaas = new AsaasApi($this->config->get('payment_asaas_pix_api_key'));
 		$this->load->language('extension/payment/asaas_pix');
 
 		$this->document->setTitle($this->language->get('heading_title'));
@@ -222,13 +226,7 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 		"email" => $this->config->get('config_email')
 		));
 
-		$this->load->model('setting/setting');
-		if ($this->config->get('payment_asaas_pix_mode')) {
-			$mode = false;
-		} else {
-			$mode = true;
-		}
-		$resposta = $this->createWebhook($webhook, $mode);
+		$resposta = $asaas->createWebhooks($webhook);
 
 		if(isset($resposta['errors'])) {
 		$this->error['warning'] = $resposta['errors'][0]['description'];	
@@ -238,28 +236,5 @@ class ControllerExtensionPaymentAsaasPix extends Controller {
 
 		$this->index();
 	}
-
-	public function createWebhook($json_convert, $sandbox = true) {
-		$url =  $sandbox ? 'https://sandbox.asaas.com/api/v3/' : 'https://www.asaas.com/api/v3/';
-    	$token = $this->config->get('payment_asaas_pix_api_key');
-		$user_agent = base64_decode('TWFzdGVyLzEuMC4wLjAgKFBsYXRhZm9ybWEgb3BlbmNhcnQuY29tIC0gREVWIE9wZW5jYXIgTWFzdGVyKQ==');
-    	$headers = array('Accept: application/json', 'Content-Type: application/json;charset=UTF-8', 'User-Agent: ' . $user_agent , 'access_token: ' . $token);
-        $soap_do = curl_init();
-        curl_setopt($soap_do, CURLOPT_URL, $url . 'webhooks');
-        curl_setopt($soap_do, CURLOPT_CONNECTTIMEOUT, 10);
-        curl_setopt($soap_do, CURLOPT_TIMEOUT,        10);
-        curl_setopt($soap_do, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_setopt($soap_do, CURLOPT_RETURNTRANSFER, true );
-        curl_setopt($soap_do, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($soap_do, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($soap_do, CURLOPT_POST,           true );
-        curl_setopt($soap_do, CURLOPT_HTTPHEADER,     $headers);
-        curl_setopt($soap_do, CURLOPT_POSTFIELDS,     $json_convert);
-        
-        $response = curl_exec($soap_do); 
-        curl_close($soap_do);
-        $resposta = json_decode($response, true);
-        return  $resposta;
-    }
 
 }

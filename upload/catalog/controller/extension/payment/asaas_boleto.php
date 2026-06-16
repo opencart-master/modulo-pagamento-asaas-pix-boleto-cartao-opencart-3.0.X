@@ -16,13 +16,7 @@ class ControllerExtensionPaymentAsaasBoleto extends Controller {
 			$order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
 			$custom = $order_info['custom_field'];
 
-			if ($this->config->get('payment_asaas_boleto_mode')) {
-			$mode = false;
-		    } else {
-			$mode = true;
-		    }
-
-			$asaas = new AsaasApi($this->config->get('payment_asaas_boleto_api_key'), $mode);
+			$asaas = new AsaasApi($this->config->get('payment_asaas_boleto_api_key'));
 
 			$getcustomer = $asaas->getCustomer($order_info['email']);
 
@@ -54,7 +48,7 @@ class ControllerExtensionPaymentAsaasBoleto extends Controller {
 			"customer" => $cid,
 			"billingType" => "BOLETO",
 			"value" => $order_info['total'],
-			"dueDate" => date('Y-m-d', strtotime('+3 days')),
+			"dueDate" => date('Y-m-d', strtotime('+' . $this->config->get('payment_asaas_boleto_venc') .' days')),
 			"description" => "Pedido " . $order_info['order_id'],
 			"externalReference"	=> $order_info['order_id'],
 			//"callback" => array("successUrl" => HTTPS_SERVER . "index.php?route=checkout/success")
